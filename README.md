@@ -6,6 +6,7 @@ Baton is the ByteStorm submission for the CodeFrontier Hackathon, Round 2. It tu
 
 - **Live demo:** <https://baton-t3ax.onrender.com>
 - **Source code:** <https://github.com/Ritika-Bhati-2266/Baton>
+- **Round 2 report:** [docs/Baton_Round2_Report.pdf](docs/Baton_Round2_Report.pdf)
 
 The central idea is simple: **every machine-generated statement in a handover is a claim with a checked quote, a visible evidence label and an access label.** Human-added content is labelled as such, and nothing reaches the incoming person until a human approves it.
 
