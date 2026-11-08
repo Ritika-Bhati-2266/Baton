@@ -1,0 +1,859 @@
+﻿"""Generate the Round 2 report as Markdown, DOCX and PDF.
+
+Run from the repository root:
+    python scripts/make_round2_report.py
+
+Set BATON_LIVE_URL before running to embed the deployed link:
+    $env:BATON_LIVE_URL = "https://baton-handover.onrender.com"
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Cm, Pt, RGBColor
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import cm
+from reportlab.platypus import (
+    Image,
+    KeepTogether,
+    PageBreak,
+    Paragraph,
+    Preformatted,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT.parent / "Baton docs"
+SHOTS = OUT / "screenshots"
+OUT.mkdir(parents=True, exist_ok=True)
+
+LIVE_URL = os.environ.get("BATON_LIVE_URL", "[ADD THE DEPLOYED RENDER URL BEFORE SUBMITTING]")
+REPO_URL = "https://github.com/Ritika-Bhati-2266/Baton"
+SMOKE_OUTPUT = ""
+smoke_file = OUT / "smoke_test_output.txt"
+if smoke_file.exists():
+    raw = smoke_file.read_bytes()
+    for encoding in ("utf-8-sig", "utf-16", "utf-8"):
+        try:
+            SMOKE_OUTPUT = raw.decode(encoding).strip()
+            break
+        except UnicodeDecodeError:
+            continue
+
+# ---------------------------------------------------------------------------
+# content
+# ---------------------------------------------------------------------------
+
+BLOCKS: list[tuple] = []
+
+
+def add(kind: str, *args):
+    BLOCKS.append((kind, *args))
+
+
+add("cover_title", "Baton")
+add("cover_sub", "An evidence-linked, permission-aware knowledge handover platform")
+add(
+    "cover_meta",
+    [
+        ("Round", "Round 2 - The Build"),
+        ("Team", "ByteStorm"),
+        ("Participant", "Ritika Bhati"),
+        ("Event", "CodeFrontier Hackathon | We Code Coders"),
+        ("Date", "8 November 2026"),
+        ("Live demo", LIVE_URL),
+        ("Source code", REPO_URL),
+    ],
+)
+add("spacer", 16)
+add(
+    "callout",
+    "This report covers the functional product, implementation details, changes from the Round 1 plan "
+    "and the three committed Round 3 improvements. The product is a working end-to-end MVP; the "
+    "limitations section is deliberately explicit.",
+)
+add("pagebreak")
+
+# 1
+add("h1", "1. Submission summary")
+add(
+    "p",
+    "Baton turns scattered, authorised project activity into a reviewed continuation plan for one "
+    "departing member and one incoming member. The unit of trust is a single claim with a checked quote, "
+    "a visible evidence label and an access label. A human resolves conflicts, answers or accepts gaps, "
+    "and approves the handover before anything is shared.",
+)
+add(
+    "table",
+    ["Area", "What is working", "How a judge can see it"],
+    [
+        ["Core workflow", "Sources to reviewable, evidence-linked handover without a broken step", "Run the seeded rover-club case end to end"],
+        ["Trust model", "Deterministic quote verification, evidence labels, conflict and gap detection", "The review console shows VERIFIED, SINGLE SOURCE, CONFLICTING and MISSING claims"],
+        ["Human control", "Per-claim approve, reject, edit, conflict resolution, gap answer/accept", "Every action is available in the review console and written to the audit log"],
+        ["Permissions", "Source ACLs, claim inheritance, server-side role filtering", "Compare the incoming, departing and approver handover views"],
+        ["Publishing", "Unresolved conflicts and critical gaps block sharing", "The publish button is disabled with explicit reasons until decisions are made"],
+        ["Reliability", "Automated end-to-end smoke test", "scripts/smoke_test.py prints SMOKE OK"],
+    ],
+)
+add("spacer", 6)
+add("h2", "Links")
+add("bullets", [
+    f"<b>Working project:</b> {LIVE_URL}",
+    f"<b>Source code:</b> {REPO_URL}",
+    "<b>Health check:</b> /health",
+    "<b>API state:</b> /api/cases/rover-demo/state",
+    "<b>OpenAPI docs:</b> /docs",
+])
+add("h2", "Judge's 90-second path")
+add("bullets", [
+    "Open the dashboard and click <b>Open the demo review console</b>.",
+    "Inspect the planted motor-driver conflict, the two critical gaps and the labelled source inventory.",
+    "Click <b>Keep this side</b> on the driver-A side, then answer or accept the critical gaps.",
+    "Click <b>Approve all reviewable</b>, then <b>Publish handover</b>.",
+    "The incoming person's view opens. Restricted claims are counted, not rendered; each visible claim links to its quote.",
+    "Switch the role tabs to compare the incoming, departing and approver views, then open the Audit page.",
+])
+
+# 2
+add("h1", "2. Problem and users")
+add(
+    "p",
+    "When a person leaves a project, the files usually stay. What leaves is the ability to interpret them. "
+    "A repository shows what the code does but not why a design was chosen. A task board shows tickets but "
+    "not which ones are quietly blocked. A chat history holds a promise to a vendor, buried in a long thread.",
+)
+add(
+    "table",
+    ["Knowledge that leaves", "Where it hides", "What goes wrong after the exit"],
+    [
+        ["Decisions and reasoning", "Chat threads, meeting notes, PR comments", "The successor re-opens settled debates or reverses a decision for the wrong reason"],
+        ["Unfinished work", "Half-merged branches, stale tickets, personal to-do lists", "Work is duplicated or silently dropped"],
+        ["Dependencies and commitments", "Emails, calls, verbal promises", "Deadlines and obligations are missed"],
+        ["Recurring problems and workarounds", "The leaver's memory", "The same failure is rediscovered expensively"],
+        ["Who to ask", "Informal relationships", "The successor does not know which contact or reviewer to approach"],
+    ],
+)
+add("h2", "Users")
+add(
+    "table",
+    ["User", "Role in a handover", "Pain today", "What Baton gives them"],
+    [
+        ["Incoming person", "Takes over ownership", "Manual digging; fear of missing a hidden commitment", "A continuation plan with owned items, risks, open questions and first-week actions, each with sources"],
+        ["Departing member", "Knows the context", "No time; documents from memory; privacy worry", "An auto-built draft to correct, plus targeted gap questions"],
+        ["Team lead / approver", "Accountable for continuity", "Cannot verify a handover or see what is missing", "A review console with evidence, conflicts, gaps and per-claim decisions"],
+        ["Admin / security owner", "Guards access", "Fear that tools leak confidential chats or credentials", "Source ACLs, redaction preview, audit log and a publish gate"],
+    ],
+)
+add(
+    "p",
+    "<b>Scope.</b> Baton solves the handover of one project from one departing member to one incoming member, "
+    "with the consent of the people who own the sources. It deliberately does not solve company-wide knowledge "
+    "search, HR offboarding or live employee monitoring.",
+)
+
+# 3
+add("h1", "3. The core idea: claims, not paragraphs")
+add(
+    "p",
+    "A fluent summary that invents an owner or hides a conflict looks authoritative and is more dangerous "
+    "than no summary. Baton therefore stores a <b>Claim Ledger</b>: a list of typed claims (decision, owner, "
+    "risk, dependency, open question, next action, blocker, recurring problem, contact). Every claim keeps the "
+    "exact supporting quote, the source ID, the date and author, an evidence label and an access label.",
+)
+add("h2", "Evidence labels")
+add(
+    "table",
+    ["Label", "Meaning", "How Baton decides"],
+    [
+        ["VERIFIED", "Quote exists and is backed well enough", "Deterministic substring check passes, and the claim rests on a primary source or two independent informal sources"],
+        ["SINGLE SOURCE", "Plausible but rests on one informal mention", "Quote check passes, but the only support is one notes or chat source"],
+        ["CONFLICTING", "Two sources disagree", "Same topic key, different value; both sides stay visible"],
+        ["MISSING", "Expected knowledge has no evidence", "Gap rule, e.g. a task with no owner or a dependency with no contact"],
+        ["HUMAN ASSERTED", "Added or changed by a person", "Edits and gap answers; never shown as machine-verified"],
+        ["INFERRED", "Conclusion drawn from checked quotes", "Supporting quotes verified in code; reviewer confirmation required"],
+        ["QUOTE FAILED", "Quote not found in the cited source", "Kept out of the reader view; appears in the reviewer queue"],
+    ],
+)
+add("h2", "Trust gates")
+add("bullets", [
+    "<b>Permissions are inherited from sources.</b> A claim takes the most restrictive access label of its evidence.",
+    "<b>No machine claim without a checked quote.</b> The verifier is deterministic code, not a model's opinion.",
+    "<b>Gaps are first-class output.</b> Baton reports what it could not find instead of inventing an answer.",
+    "<b>Nothing is shared until a human approves it.</b> The incoming person sees approved claims only.",
+])
+
+# 4
+add("h1", "4. Complete workflow")
+add(
+    "table",
+    ["Step", "What the user does", "What the system does", "Output"],
+    [
+        ["1. Connect", "Creates a handover case, picks sources and sets access labels", "Read-only ingestion, stable chunking, redaction preview", "Indexed, labelled source chunks"],
+        ["2. Reconstruct", "Waits for the pipeline", "Deterministic extraction of typed claims with quote and source", "Draft Claim Ledger"],
+        ["3. Verify", "Reviews the label dashboard", "Quote match, conflict detection by topic key, gap rules", "Claims with evidence labels and a gap list"],
+        ["4. Review", "Edits, rejects, approves, resolves conflicts, answers or accepts gaps", "Stores reviewer identity and time; blocks publishing while blocking issues remain", "Approved, versioned ledger"],
+        ["5. Handover", "Opens a role-appropriate view and acknowledges receipt", "Filters claims by the reader's permissions; logs access and acknowledgement", "Continuation plan plus receipt"],
+    ],
+)
+add("h2", "Demo scenario: the rover club")
+add(
+    "p",
+    "A student club is handing over its autonomous-rover project from A. Rao to N. Singh. The synthetic dataset "
+    "contains a README, meeting notes, a commit export, a task CSV, a leads-only chat export and a private budget "
+    "note. The following failures are planted so they can be tested repeatably:",
+)
+add("bullets", [
+    "<b>Conflict:</b> the 12 October meeting decided to move to motor driver B, but the README and the latest commit still configure driver A.",
+    "<b>Critical gap:</b> the spare-driver task has no owner.",
+    "<b>Critical gap:</b> the demo-venue dependency has no contact.",
+    "<b>Non-critical gap:</b> no rollback procedure is documented.",
+    "<b>Permission test:</b> the vendor chat is leads-only and the budget note is private.",
+])
+
+# 5
+add("h1", "5. Implemented features")
+add("h2", "Round 2 Must features")
+add(
+    "table",
+    ["Feature", "Status", "Where it lives"],
+    [
+        ["Document, Markdown, text, CSV, JSON and PDF upload", "Done", "Sources page; /cases/{id}/sources/upload"],
+        ["Read-only GitHub import of public issues and commits", "Done", "POST /cases/{id}/sources/github"],
+        ["Typed claim extraction with quote, source, date and author", "Done", "app/extract.py, app/pipeline.py"],
+        ["Deterministic quote verifier", "Done", "app/verify.py"],
+        ["Evidence labels, conflict detection and gap rules", "Done", "app/verify.py"],
+        ["Review console: edit, reject and approve per claim", "Done", "review.html, /claims/{id}/... routes"],
+        ["Conflict resolution: keep a side or reject both", "Done", "POST /conflicts/{id}/resolve"],
+        ["Role-based views with source ACLs", "Done", "app/verify.py, handover.html"],
+        ["Secret stripping and identity pseudonymisation preview", "Done", "app/redaction.py, Sources page"],
+        ["Append-only audit log", "Done", "audit table, Audit page"],
+        ["Publishing gate for unresolved conflicts and critical gaps", "Done", "publish_rules, Publish button"],
+    ],
+)
+add("h2", "Additional features delivered")
+add("bullets", [
+    "Acknowledgement of receipt, with the acknowledgement stored on the case and in the audit log.",
+    "Human answer to a gap, stored as HUMAN ASSERTED evidence.",
+    "Inferred claims that require explicit reviewer confirmation.",
+    "JSON state API and automatic OpenAPI documentation.",
+    "Docker and Render deployment configuration.",
+    "Automated end-to-end smoke test.",
+])
+add("h2", "Screens in the working product")
+add("image", SHOTS / "review_top.png", "Review console: blocking issues, evidence labels, conflicts and critical gaps.")
+add("image", SHOTS / "review_ready.png", "After the human decisions: conflict resolved, gaps handled, claims approved.")
+add("image", SHOTS / "handover_top.png", "Incoming-person view: filtered, evidence-linked and approved.")
+
+# 6
+add("h1", "6. Architecture and implementation")
+add(
+    "code",
+    "Browser\n"
+    "  |  server-rendered HTML + small JS\n"
+    "  v\n"
+    "FastAPI service\n"
+    "  |-- ingestion: upload / GitHub / demo seed\n"
+    "  |-- chunking + redaction preview\n"
+    "  |-- deterministic extraction (typed claims + quotes)\n"
+    "  |-- deterministic verifier (quote match, conflicts, gaps)\n"
+    "  |-- SQLite claim ledger (claims, evidence, conflicts, audit)\n"
+    "  |-- review actions + publish gate\n"
+    "  +-- role-filtered handover views",
+)
+add(
+    "table",
+    ["Layer", "Choice", "Why"],
+    [
+        ["Backend", "FastAPI + Python 3.12", "Typed request/response handling, automatic OpenAPI docs, strong text-processing ecosystem"],
+        ["Templates", "Jinja2", "Server-rendered review and reader views with no separate build step"],
+        ["Storage", "SQLite (WAL)", "One deployable service for the demo; transparent ledger for judges"],
+        ["Parsing", "pypdf, csv, json", "PDF, task CSV and repository export ingestion"],
+        ["GitHub", "httpx + GitHub REST API", "Read-only public import; optional GITHUB_TOKEN for private repos"],
+        ["Deployment", "Docker + Render", "One command local setup and a public judge-accessible link"],
+        ["Tests", "FastAPI TestClient", "Full journey assertions without a browser"],
+    ],
+)
+add("h2", "Data model")
+add(
+    "table",
+    ["Table", "Purpose"],
+    [
+        ["cases", "Handover case, status, published version and acknowledgement"],
+        ["sources", "Authorised inputs with kind, ACL, author and source date"],
+        ["chunks", "Stable source windows with character offsets"],
+        ["claims", "Typed claims with value, owner, due date, event date, basis, evidence label and status"],
+        ["evidence", "Quote, chunk, source and verification result"],
+        ["conflicts", "Topic-level disagreement and its resolution"],
+        ["audit", "Append-only record of approvals, edits, resolutions, publishing and access events"],
+    ],
+)
+add("h2", "Key algorithms")
+add("bullets", [
+    "<b>Stable chunking:</b> sources are split into overlapping windows with permanent IDs and character offsets.",
+    "<b>Typed extraction:</b> explicit markers, README ownership sentences, run instructions, commit/issue JSON, task CSV rows and chat exports produce claims with exact quotes.",
+    "<b>Deterministic verification:</b> whitespace-normalised substring check against the cited source; failure downgrades the claim to QUOTE FAILED.",
+    "<b>Conflict detection:</b> claims on the same value topic with different values are paired and marked CONFLICTING; both sides remain visible.",
+    "<b>Gap rules:</b> an unowned task topic, a dependency with no contact and a missing rollback procedure produce MISSING claims.",
+    "<b>Access filtering:</b> claims inherit the most restrictive source ACL; role views filter in code, never by re-prompting a model.",
+    "<b>Publish gate:</b> open conflicts, unaccepted critical gaps and zero approved claims block publishing.",
+    "<b>Audit:</b> every review action is appended with actor, role, action, detail and timestamp.",
+])
+add("h2", "API surface")
+add(
+    "table",
+    ["Method and path", "Purpose"],
+    [
+        ["GET /", "Dashboard and case list"],
+        ["GET /cases/{id}/review", "Review console with filters"],
+        ["POST /cases/{id}/build", "Run ingestion, extraction, verification, conflicts and gaps"],
+        ["POST /claims/{id}/approve, /reject, /edit", "Per-claim human decisions"],
+        ["POST /conflicts/{id}/resolve", "Keep one side or reject both"],
+        ["POST /claims/{id}/accept-gap, /answer-gap", "Handle missing knowledge explicitly"],
+        ["POST /cases/{id}/publish", "Enforce the publish gate and increment the version"],
+        ["GET /cases/{id}/handover?role=...", "Role-filtered continuation plan"],
+        ["GET /cases/{id}/audit", "Append-only audit trail"],
+        ["GET /api/cases/{id}/state", "Machine-readable ledger state"],
+        ["GET /health", "Deployment health check"],
+    ],
+)
+
+# 7
+add("h1", "7. Permissions, privacy and security")
+add(
+    "table",
+    ["Role", "Allowed access labels", "What they see"],
+    [
+        ["Incoming person", "team", "Approved team-labelled claims only; restricted items become a count, never partial text"],
+        ["Departing member", "team, leads", "Team and leads-only claims; private finance notes remain hidden"],
+        ["Approver", "team, leads, private", "The full ledger, including private evidence, to make an informed decision"],
+        ["Admin", "team, leads, private", "Full ledger plus audit access"],
+    ],
+)
+add("bullets", [
+    "<b>Connecting a source does not make it shareable.</b> The upload form requires an explicit ACL.",
+    "<b>Claim inheritance.</b> The claim takes the most restrictive label of its evidence.",
+    "<b>Server-side filtering.</b> The incoming view is produced by code, and the automated test asserts that leads-only and private text cannot leak.",
+    "<b>Redaction preview.</b> The Sources page shows what an external model would see after secret and identity replacement.",
+    "<b>Secret handling.</b> GitHub tokens are used for the request only and are never stored.",
+    "<b>Model boundary.</b> The default extractor runs locally. If an external adapter is enabled in a later round, only team-labelled text is eligible; leads and private sources stay inside the deployment.",
+    "<b>Human control.</b> Edits and gap answers are labelled HUMAN ASSERTED and are never presented as machine-verified.",
+    "<b>No monitoring.</b> Baton operates on one project at the moment a handover is needed.",
+])
+
+# 8
+add("h1", "8. Reliability and failure handling")
+add(
+    "table",
+    ["Failure case", "What Baton does"],
+    [
+        ["Quote not found in the source", "Marks the claim QUOTE FAILED; it stays out of the reader view and appears for correction or rejection"],
+        ["Two sources disagree", "Marks the topic CONFLICTING and blocks publishing until a human resolves it"],
+        ["Task with no owner", "Creates a critical MISSING gap; blocks publishing until answered or accepted"],
+        ["Dependency with no contact", "Creates a critical MISSING gap; blocks publishing until answered or accepted"],
+        ["No rollback procedure", "Creates a non-critical MISSING gap; shown as a known gap once accepted"],
+        ["No sources", "Stops the pipeline with a clear message instead of producing an empty handover"],
+        ["File too large or unreadable", "Rejects the upload with an explicit error; existing sources are untouched"],
+        ["GitHub import fails", "Returns the HTTP status and keeps the rest of the case usable"],
+        ["Rebuild after human decisions", "Requires confirmation and resets derived claims; the source inventory is preserved"],
+        ["Unapproved claims", "Never included in the published handover"],
+    ],
+)
+
+# 9
+add("h1", "9. Testing evidence")
+add(
+    "p",
+    "The end-to-end smoke test uses a temporary database, so it never touches local data. It exercises the "
+    "same routes a judge uses and asserts the permission guarantee directly.",
+)
+add("callout", "Command: python scripts/smoke_test.py")
+if SMOKE_OUTPUT:
+    add("code", SMOKE_OUTPUT)
+add("h2", "What the test asserts")
+add("bullets", [
+    "The planted motor-driver conflict is detected.",
+    "Critical gaps are detected.",
+    "Publishing is blocked before the human decisions.",
+    "Conflict resolution and gap handling update the publish gate.",
+    "Publishing produces version 1.",
+    "The incoming view does not contain leads-only or private text.",
+    "The approver view does contain the restricted claims.",
+    "Acknowledgement is recorded and the audit log contains the publish and acknowledge events.",
+])
+
+# 10
+add("h1", "10. Changes from the Round 1 plan")
+add(
+    "table",
+    ["Round 1 plan", "Round 2 implementation", "Why"],
+    [
+        ["Next.js + FastAPI + PostgreSQL", "FastAPI + Jinja + SQLite", "One deployable service; the trust model and claim schema are unchanged. A React frontend can be added without changing the ledger."],
+        ["Claude extraction as the primary path", "Deterministic local extraction, optional LLM adapter later", "The demo works without a paid key; the verifier is the source of truth, and an LLM cannot grade its own work."],
+        ["Task and chat connectors in Round 3", "Task CSV and chat export connectors already work", "They were cheap to add and strengthen the permission demonstration."],
+        ["Redis/RQ background jobs", "Synchronous pipeline with visible progress", "The demo corpus is small; a queue is a scale concern, not a correctness concern."],
+        ["PostgreSQL row-level security", "Application-level claim filtering plus an automated role test", "The user-visible guarantee is tested: zero restricted claims in the incoming view."],
+        ["PDF export, version diff, question flow, acknowledgement in Round 3", "Acknowledgement and gap answers are partially implemented; version diff and PDF export remain Round 3", "They are meaningful, visible additions for the next round."],
+    ],
+)
+add(
+    "p",
+    "<b>Scope discipline.</b> The build focused on one complete journey rather than many shallow integrations. "
+    "Two source families (documents and repository exports) plus task and chat imports are enough to demonstrate "
+    "the whole workflow. Live Slack or Gmail OAuth, mobile apps and enterprise SSO remain out of scope for the event.",
+)
+
+# 11
+add("h1", "11. Three major improvements for Round 3")
+add("h2", "1. Departing-member question flow")
+add(
+    "p",
+    "<b>What:</b> critical gaps become targeted questions routed to the departing member, with structured answers, "
+    "reminders and a status for each question. Answers are stored as HUMAN ASSERTED evidence and re-verified where possible.",
+)
+add("p", "<b>Why:</b> the current build lets the approver answer or accept a gap. Routing the question to the person who actually knows closes the tacit-knowledge gap instead of forcing the approver to guess.")
+add("p", "<b>How measured:</b> every critical gap has an answer or an explicit acceptance; the handover shows the answer's author and timestamp.")
+add("h2", "2. Version diff and decision timeline across publishes")
+add(
+    "p",
+    "<b>What:</b> a reader-facing 'what changed since vN' view and a diff of claims added, removed, re-labelled or re-owned between handover versions, including conflict resolutions and gap decisions.",
+)
+add("p", "<b>Why:</b> a handover is not a one-time document. When the project moves on, the incoming person needs to see what changed without re-reading the whole ledger.")
+add("p", "<b>How measured:</b> republishing a case produces a visible diff with counts per section and links to the changed claims.")
+add("h2", "3. Incoming-person feedback loop and section-level acknowledgement")
+add(
+    "p",
+    "<b>What:</b> the incoming person can confirm, dispute or request access per section. A dispute re-opens the claim for the approver, and the audit log captures the full loop.",
+)
+add("p", "<b>Why:</b> acknowledgement is currently a single receipt. Section-level feedback turns the handover into a two-way, auditable transition rather than a broadcast.")
+add("p", "<b>How measured:</b> a disputed section returns to the approver queue, and the audit log shows the dispute, the correction and the re-acknowledgement.")
+
+# 12
+add("h1", "12. Demo script for judges")
+add("bullets", [
+    "Open the dashboard. The demo case shows 6 sources and 0 claims before the first build.",
+    "Open the review console and click <b>Rebuild ledger</b>.",
+    "Inspect the conflict card: meeting notes say driver B; README and commit say driver A.",
+    "Click <b>Keep this side</b> on the driver-A group.",
+    "Answer the spare-driver ownership gap with a short human answer; accept or answer the demo-venue dependency gap.",
+    "Click <b>Approve all reviewable</b>. The publish banner turns green.",
+    "Click <b>Publish handover</b>. The incoming view opens as approved v1.",
+    "Note the restricted-item count on the right. The incoming person cannot see the leads-only chat or the private budget note.",
+    "Switch to the approver role to see the restricted claims. Open the Audit page to see every decision.",
+    "Click <b>Acknowledge receipt</b> as the incoming person; the acknowledgement appears in the audit log.",
+])
+
+# 13
+add("h1", "13. Known limitations and future scope")
+add("bullets", [
+    "<b>Authentication is simulated with role tabs</b> so judges can open every link without signing in. Production would bind roles to an authenticated session or SSO.",
+    "<b>SQLite is single-node.</b> A multi-user deployment should move the ledger to PostgreSQL.",
+    "<b>The deterministic extractor is strongest on structured notes and exports.</b> Free prose needs the optional LLM adapter or careful marker use.",
+    "<b>The GitHub connector is read-only</b> and capped at 20 issues and 20 commits per import.",
+    "<b>PDF extraction depends on a text layer.</b> Scanned PDFs need OCR, which is future scope.",
+    "<b>The free hosting filesystem is ephemeral.</b> The synthetic demo reseeds after a restart; a persistent volume is needed for real data.",
+    "<b>No email or notification delivery yet.</b> The departing-member question flow is a Round 3 improvement.",
+    "<b>Future scope:</b> PostgreSQL and row-level security, SSO, live Slack/Drive/Jira connectors, continuous ledger mode, on-premise local models, role templates and a grounding evaluation suite.",
+])
+
+# 14
+add("h1", "14. Responsible design and disclosures")
+add("bullets", [
+    "All demonstration data is synthetic. No confidential workplace material is used.",
+    "Connectors require explicit consent from the source owner; the upload screen warns against confidential material.",
+    "Restricted claims are filtered server-side and rendered only as a count.",
+    "Human edits and gap answers are never presented as machine-verified.",
+    "The audit log records who approved, edited, resolved, published and acknowledged.",
+    "The product does not monitor employees; it operates on one project at the moment a handover is needed.",
+    "<b>AI assistance disclosure:</b> an AI assistant was used to help structure, draft and revise the plan and the implementation. The verifier, permission tests and demo behaviour are executable and can be inspected in the repository.",
+    "<b>Third-party libraries:</b> FastAPI, Uvicorn, Jinja2, pypdf, httpx, python-docx and reportlab (report generation only). No product code existed before the build window.",
+])
+
+# 15
+add("h1", "15. Team and contribution")
+add(
+    "table",
+    ["Name", "Role", "Contribution"],
+    [
+        ["Ritika Bhati", "Team lead; backend, verification, frontend, product and QA", "Claim schema, deterministic extractor and verifier, conflict and gap rules, FastAPI routes, SQLite ledger, permission filtering, review console, reader view, synthetic dataset, tests, documentation and demo"],
+    ],
+)
+add("p", "Team name: ByteStorm. Solo submission for CodeFrontier Hackathon, Round 2.")
+
+# appendix
+add("pagebreak")
+add("h1", "Appendix A. Repository structure")
+add(
+    "code",
+    "Baton/  (repository root)\n"
+    "  app/\n"
+    "    main.py          FastAPI routes and pages\n"
+    "    db.py            SQLite schema and helpers\n"
+    "    seed.py          synthetic rover-club dataset\n"
+    "    extract.py       typed claim extraction\n"
+    "    verify.py        labels, conflicts, gaps, publish gate\n"
+    "    pipeline.py      chunking and build orchestration\n"
+    "    redaction.py     secret stripping and pseudonymisation preview\n"
+    "    templates/       dashboard, review, sources, handover, audit\n"
+    "    static/          app.css, app.js\n"
+    "  scripts/\n"
+    "    smoke_test.py    end-to-end test\n"
+    "    make_round2_report.py\n"
+    "  requirements.txt\n"
+    "  Dockerfile\n"
+    "  render.yaml\n"
+    "  run.ps1 / run.sh\n"
+    "  README.md",
+)
+add("h1", "Appendix B. Run and test")
+add(
+    "code",
+    "Windows:\n"
+    "  cd Baton\n"
+    "  .\\run.ps1\n"
+    "\n"
+    "macOS / Linux:\n"
+    "  cd Baton\n"
+    "  sh run.sh\n"
+    "\n"
+    "Docker:\n"
+    "  docker build -t baton .\n"
+    "  docker run --rm -p 8000:8000 baton\n"
+    "\n"
+    "Test:\n"
+    "  python scripts/smoke_test.py",
+)
+
+# ---------------------------------------------------------------------------
+# Markdown
+# ---------------------------------------------------------------------------
+
+def write_markdown() -> None:
+    lines: list[str] = []
+    for block in BLOCKS:
+        kind = block[0]
+        if kind == "cover_title":
+            lines += [f"# {block[1]}", ""]
+        elif kind == "cover_sub":
+            lines += [f"**{block[1]}**", ""]
+        elif kind == "cover_meta":
+            for key, value in block[1]:
+                lines.append(f"- **{key}:** {value}")
+            lines.append("")
+        elif kind == "callout":
+            lines += [f"> {block[1]}", ""]
+        elif kind == "h1":
+            lines += [f"## {block[1]}", ""]
+        elif kind == "h2":
+            lines += [f"### {block[1]}", ""]
+        elif kind == "p":
+            lines += [block[1], ""]
+        elif kind == "bullets":
+            for item in block[1]:
+                lines.append(f"- {item}")
+            lines.append("")
+        elif kind == "table":
+            headers, rows = block[1], block[2]
+            lines.append("| " + " | ".join(headers) + " |")
+            lines.append("|" + "|".join(["---"] * len(headers)) + "|")
+            for row in rows:
+                lines.append("| " + " | ".join(str(cell) for cell in row) + " |")
+            lines.append("")
+        elif kind == "code":
+            lines += ["```", block[1], "```", ""]
+        elif kind == "image":
+            path, caption = block[1], block[2]
+            rel = path.relative_to(OUT).as_posix()
+            lines += [f"![{caption}]({rel})", "", f"*{caption}*", ""]
+        elif kind == "pagebreak":
+            lines += ["---", ""]
+        elif kind == "spacer":
+            lines.append("")
+    (OUT / "Baton_Round2_Report.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# DOCX
+# ---------------------------------------------------------------------------
+
+def write_docx() -> None:
+    doc = Document()
+    section = doc.sections[0]
+    section.top_margin = Cm(2.2)
+    section.bottom_margin = Cm(2.2)
+    section.left_margin = Cm(2.4)
+    section.right_margin = Cm(2.4)
+
+    styles = doc.styles
+    normal = styles["Normal"]
+    normal.font.name = "Calibri"
+    normal.font.size = Pt(10.5)
+    normal.paragraph_format.space_after = Pt(6)
+    normal.paragraph_format.line_spacing = 1.15
+
+    def shade(paragraph, hex_fill: str) -> None:
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+
+        pPr = paragraph._p.get_or_add_pPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:val"), "clear")
+        shd.set(qn("w:color"), "auto")
+        shd.set(qn("w:fill"), hex_fill)
+        pPr.append(shd)
+
+    for block in BLOCKS:
+        kind = block[0]
+        if kind == "cover_title":
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            run = p.add_run(block[1])
+            run.bold = True
+            run.font.size = Pt(34)
+            run.font.color.rgb = RGBColor(0x37, 0x30, 0xA3)
+        elif kind == "cover_sub":
+            p = doc.add_paragraph(block[1])
+            p.runs[0].italic = True
+            p.runs[0].font.size = Pt(14)
+            p.runs[0].font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+        elif kind == "cover_meta":
+            for key, value in block[1]:
+                p = doc.add_paragraph()
+                p.add_run(f"{key}: ").bold = True
+                p.add_run(value)
+        elif kind == "callout":
+            p = doc.add_paragraph(block[1])
+            shade(p, "EEF2FF")
+        elif kind == "h1":
+            doc.add_heading(block[1], level=1)
+        elif kind == "h2":
+            doc.add_heading(block[1], level=2)
+        elif kind == "p":
+            doc.add_paragraph(block[1])
+        elif kind == "bullets":
+            for item in block[1]:
+                doc.add_paragraph(item, style="List Bullet")
+        elif kind == "table":
+            headers, rows = block[1], block[2]
+            table = doc.add_table(rows=1, cols=len(headers))
+            table.style = "Light Grid Accent 1"
+            hdr = table.rows[0].cells
+            for i, header in enumerate(headers):
+                hdr[i].text = str(header)
+                for run in hdr[i].paragraphs[0].runs:
+                    run.bold = True
+            for row in rows:
+                cells = table.add_row().cells
+                for i, cell in enumerate(row):
+                    cells[i].text = str(cell)
+            doc.add_paragraph("")
+        elif kind == "code":
+            p = doc.add_paragraph()
+            run = p.add_run(block[1])
+            run.font.name = "Consolas"
+            run.font.size = Pt(8.5)
+            shade(p, "F1F5F9")
+        elif kind == "image":
+            path, caption = block[1], block[2]
+            doc.add_picture(str(path), width=Cm(16))
+            cap = doc.add_paragraph(caption)
+            cap.runs[0].italic = True
+            cap.runs[0].font.size = Pt(8.5)
+            cap.runs[0].font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+        elif kind == "pagebreak":
+            doc.add_page_break()
+        elif kind == "spacer":
+            doc.add_paragraph("")
+
+    doc.save(OUT / "Baton_Round2_Report.docx")
+
+
+# ---------------------------------------------------------------------------
+# PDF
+# ---------------------------------------------------------------------------
+
+def write_pdf() -> None:
+    page_width, page_height = A4
+    margin = 1.9 * cm
+
+    styles = getSampleStyleSheet()
+    title = ParagraphStyle(
+        "CoverTitle", parent=styles["Title"], fontName="Helvetica-Bold",
+        fontSize=34, leading=38, textColor=colors.HexColor("#3730A3"), alignment=TA_LEFT,
+        spaceAfter=6,
+    )
+    subtitle = ParagraphStyle(
+        "CoverSub", parent=styles["Normal"], fontName="Helvetica-Oblique",
+        fontSize=13, leading=17, textColor=colors.HexColor("#64748B"), spaceAfter=14,
+    )
+    meta = ParagraphStyle(
+        "Meta", parent=styles["Normal"], fontName="Helvetica", fontSize=9.5, leading=14,
+        textColor=colors.HexColor("#334155"),
+    )
+    h1 = ParagraphStyle(
+        "H1", parent=styles["Heading1"], fontName="Helvetica-Bold", fontSize=17, leading=21,
+        textColor=colors.HexColor("#1E1B4B"), spaceBefore=16, spaceAfter=8, keepWithNext=True,
+    )
+    h2 = ParagraphStyle(
+        "H2", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=12.5, leading=16,
+        textColor=colors.HexColor("#3730A3"), spaceBefore=11, spaceAfter=5, keepWithNext=True,
+    )
+    body = ParagraphStyle(
+        "Body", parent=styles["BodyText"], fontName="Helvetica", fontSize=9.6, leading=14,
+        textColor=colors.HexColor("#1F2937"), spaceAfter=6, alignment=TA_LEFT,
+    )
+    bullet = ParagraphStyle(
+        "Bullet", parent=body, leftIndent=14, bulletIndent=3, spaceAfter=3,
+    )
+    cell = ParagraphStyle(
+        "Cell", parent=body, fontSize=8.3, leading=11, spaceAfter=0,
+    )
+    cell_head = ParagraphStyle(
+        "CellHead", parent=cell, fontName="Helvetica-Bold", textColor=colors.white,
+    )
+    code = ParagraphStyle(
+        "Code", parent=body, fontName="Courier", fontSize=7.8, leading=10,
+        textColor=colors.HexColor("#0F172A"),
+    )
+    caption = ParagraphStyle(
+        "Caption", parent=body, fontName="Helvetica-Oblique", fontSize=8.3,
+        textColor=colors.HexColor("#64748B"), alignment=TA_CENTER, spaceBefore=3, spaceAfter=8,
+    )
+    callout = ParagraphStyle(
+        "Callout", parent=body, fontSize=9.4, leading=14, textColor=colors.HexColor("#1E1B4B"),
+        backColor=colors.HexColor("#EEF2FF"), borderColor=colors.HexColor("#C7D2FE"),
+        borderWidth=0.8, borderPadding=8, spaceBefore=8, spaceAfter=10,
+    )
+
+    def esc(text: str) -> str:
+        return (
+            str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        )
+
+    def make_table(headers, rows):
+        data = [[Paragraph(esc(h), cell_head) for h in headers]]
+        for row in rows:
+            data.append([Paragraph(str(c).replace("\n", "<br/>"), cell) for c in row])
+        total = page_width - 2 * margin
+        if len(headers) == 3:
+            widths = [total * 0.25, total * 0.33, total * 0.42]
+        elif len(headers) == 4:
+            widths = [total * 0.18, total * 0.22, total * 0.25, total * 0.35]
+        elif len(headers) == 2:
+            widths = [total * 0.36, total * 0.64]
+        else:
+            widths = [total / len(headers)] * len(headers)
+        table = Table(data, colWidths=widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3730A3")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD5E1")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+        ]))
+        return table
+
+    def header_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor("#E2E8F0"))
+        canvas.setLineWidth(0.6)
+        canvas.line(margin, page_height - 1.2 * cm, page_width - margin, page_height - 1.2 * cm)
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(colors.HexColor("#64748B"))
+        canvas.drawString(margin, page_height - 1.0 * cm, "Baton - ByteStorm - Round 2 Report")
+        canvas.drawRightString(page_width - margin, page_height - 1.0 * cm, f"Page {doc.page}")
+        canvas.line(margin, 1.2 * cm, page_width - margin, 1.2 * cm)
+        canvas.drawString(margin, 0.8 * cm, "Evidence-linked handover - CodeFrontier Hackathon")
+        canvas.drawRightString(page_width - margin, 0.8 * cm, "8 November 2026")
+        canvas.restoreState()
+
+    story = []
+    for block in BLOCKS:
+        kind = block[0]
+        if kind == "cover_title":
+            story.append(Spacer(1, 1.2 * cm))
+            story.append(Paragraph(esc(block[1]), title))
+        elif kind == "cover_sub":
+            story.append(Paragraph(esc(block[1]), subtitle))
+        elif kind == "cover_meta":
+            rows = [[Paragraph(f"<b>{esc(k)}</b>", meta), Paragraph(esc(v), meta)] for k, v in block[1]]
+            t = Table(rows, colWidths=[3.2 * cm, page_width - 2 * margin - 3.2 * cm])
+            t.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]))
+            story.append(t)
+        elif kind == "callout":
+            story.append(Paragraph(esc(block[1]), callout))
+        elif kind == "h1":
+            story.append(Paragraph(esc(block[1]), h1))
+        elif kind == "h2":
+            story.append(Paragraph(esc(block[1]), h2))
+        elif kind == "p":
+            story.append(Paragraph(block[1], body))
+        elif kind == "bullets":
+            for item in block[1]:
+                story.append(Paragraph(item, bullet, bulletText="\u2022"))
+        elif kind == "table":
+            story.append(make_table(block[1], block[2]))
+            story.append(Spacer(1, 6))
+        elif kind == "code":
+            pre = Preformatted(block[1], code)
+            wrapper = Table([[pre]], colWidths=[page_width - 2 * margin])
+            wrapper.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            story.append(wrapper)
+            story.append(Spacer(1, 6))
+        elif kind == "image":
+            path, cap = block[1], block[2]
+            if path.exists():
+                img = Image(str(path), width=page_width - 2 * margin,
+                            height=(page_width - 2 * margin) * 1000 / 1440)
+                story.append(KeepTogether([img, Paragraph(esc(cap), caption)]))
+        elif kind == "pagebreak":
+            story.append(PageBreak())
+        elif kind == "spacer":
+            story.append(Spacer(1, block[1]))
+
+    doc = SimpleDocTemplate(
+        str(OUT / "Baton_Round2_Report.pdf"),
+        pagesize=A4,
+        leftMargin=margin,
+        rightMargin=margin,
+        topMargin=1.6 * cm,
+        bottomMargin=1.6 * cm,
+        title="Baton - Round 2 Report",
+        author="Ritika Bhati, ByteStorm",
+        subject="CodeFrontier Hackathon Round 2",
+    )
+    doc.build(story, onFirstPage=header_footer, onLaterPages=header_footer)
+
+
+if __name__ == "__main__":
+    write_markdown()
+    write_docx()
+    write_pdf()
+    print(f"Wrote report to {OUT}")
+    print(f"Live URL used: {LIVE_URL}")
+

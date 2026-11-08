@@ -1,4 +1,4 @@
-# Baton
+﻿# Baton
 
 **An evidence-linked, permission-aware knowledge handover platform.**
 
@@ -14,7 +14,7 @@ The central idea is simple: **every machine-generated statement in a handover is
 ## Quick start (Windows)
 
 ```powershell
-cd "D:\PROJECTS\Hackathon\Baton\baton"
+cd "D:\PROJECTS\Hackathon\Baton"
 .\run.ps1
 ```
 
@@ -23,7 +23,7 @@ Then open <http://127.0.0.1:8000>.
 ## Quick start (macOS / Linux / Docker)
 
 ```sh
-cd baton
+cd Baton
 sh run.sh
 # or
 docker build -t baton .
@@ -168,11 +168,11 @@ The rover-club dataset contains:
 
 Planted failures:
 
-1. Driver B (meeting) vs driver A (README + commit) — **conflict**.
-2. Spare-driver task with no owner — **critical gap**.
-3. Demo venue dependency with no contact — **critical gap**.
-4. No rollback procedure — **non-critical gap**.
-5. Leads-only vendor messages and a private budget note — **permission test**.
+1. Driver B (meeting) vs driver A (README + commit) â€” **conflict**.
+2. Spare-driver task with no owner â€” **critical gap**.
+3. Demo venue dependency with no contact â€” **critical gap**.
+4. No rollback procedure â€” **non-critical gap**.
+5. Leads-only vendor messages and a private budget note â€” **permission test**.
 
 ---
 
@@ -180,17 +180,17 @@ Planted failures:
 
 ```
 Browser
-  │  HTML + small JS (server-rendered Jinja templates)
-  ▼
+  â”‚  HTML + small JS (server-rendered Jinja templates)
+  â–¼
 FastAPI (app/main.py)
-  │
-  ├── ingestion (upload / GitHub / demo seed)
-  ├── chunking + redaction preview        app/pipeline.py, app/redaction.py
-  ├── deterministic extraction            app/extract.py
-  ├── deterministic verifier              app/verify.py
-  ├── claim ledger + conflicts + gaps     SQLite (app/db.py)
-  ├── review actions + publish gate       app/main.py, app/verify.py
-  └── role-filtered handover views         app/verify.py, handover.html
+  â”‚
+  â”œâ”€â”€ ingestion (upload / GitHub / demo seed)
+  â”œâ”€â”€ chunking + redaction preview        app/pipeline.py, app/redaction.py
+  â”œâ”€â”€ deterministic extraction            app/extract.py
+  â”œâ”€â”€ deterministic verifier              app/verify.py
+  â”œâ”€â”€ claim ledger + conflicts + gaps     SQLite (app/db.py)
+  â”œâ”€â”€ review actions + publish gate       app/main.py, app/verify.py
+  â””â”€â”€ role-filtered handover views         app/verify.py, handover.html
 ```
 
 ### Technology
@@ -211,13 +211,13 @@ The Round 1 plan proposed a split Next.js/FastAPI stack. Within the Round 2 buil
 
 ## Data model
 
-- `cases` — handover case, status, published version, acknowledgement.
-- `sources` — authorised inputs with ACL and metadata.
-- `chunks` — stable source windows with character offsets.
-- `claims` — typed claims with value, owner, due date, event date, contact, basis, evidence label and status.
-- `evidence` — quote + chunk + source + verification result.
-- `conflicts` — topic-level disagreement with resolution state.
-- `audit` — append-only action log.
+- `cases` â€” handover case, status, published version, acknowledgement.
+- `sources` â€” authorised inputs with ACL and metadata.
+- `chunks` â€” stable source windows with character offsets.
+- `claims` â€” typed claims with value, owner, due date, event date, contact, basis, evidence label and status.
+- `evidence` â€” quote + chunk + source + verification result.
+- `conflicts` â€” topic-level disagreement with resolution state.
+- `audit` â€” append-only action log.
 
 The JSON state API exposes all of this at `/api/cases/{id}/state`.
 
@@ -245,7 +245,7 @@ The deterministic extractor is the source of record. `BATON_USE_LLM=1` plus an A
 ## Testing
 
 ```powershell
-cd baton
+cd Baton
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe scripts\smoke_test.py
@@ -329,8 +329,9 @@ SQLite lives inside the container. For a persistent deployment, mount a volume a
 
 ## Team
 
-**ByteStorm** — solo submission.
+**ByteStorm** â€” solo submission.
 
-- Ritika Bhati — team lead, backend, verification, frontend, product and QA.
+- Ritika Bhati â€” team lead, backend, verification, frontend, product and QA.
 
 AI assistance was used to structure, draft and revise the plan and the implementation. The verifier, permission tests and demo behaviour are executable and can be inspected in the repository.
+
