@@ -46,6 +46,9 @@ ROLE_NAMES = {
 async def lifespan(_: FastAPI):
     init_db()
     seed_demo()
+    if not query_one("SELECT COUNT(*) AS n FROM claims WHERE case_id = ?", (CASE_ID,))["n"]:
+        if query_one("SELECT COUNT(*) AS n FROM sources WHERE case_id = ?", (CASE_ID,))["n"]:
+            build_case(CASE_ID)
     yield
 
 
@@ -395,8 +398,9 @@ def run_pipeline(case_id: str):
     if result["ok"]:
         return redirect(
             review_url(case_id),
-            f"Pipeline complete: {result['claims']} claims from {result['sources']} sources, "
-            f"{result['conflicts']} conflict(s), {result['gaps']} gap(s).",
+            f"Pipeline complete: {result['total_claims']} claims from {result['sources']} sources "
+            f"({result['claims']} extracted + {result['gaps']} gap(s)), "
+            f"{result['conflicts']} conflict(s).",
         )
     return redirect(f"/cases/{case_id}/sources", result["error"], "error")
 
@@ -837,6 +841,7 @@ def delete_source(case_id: str, source_id: str):
 def reset_demo():
     database.reset_all()
     seed_demo(force=True)
+    build_case(CASE_ID)
     return redirect("/", "Demo data reset to its original state.")
 
 

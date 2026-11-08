@@ -142,17 +142,19 @@ def build_case(case_id: str) -> dict:
            FROM claims WHERE case_id = ? GROUP BY evidence_label""",
         (case_id,),
     )
+    total_claims = sum(row["n"] for row in counts)
     audit(
         case_id,
         "System",
         "system",
         "pipeline_built",
-        f"{len(sources)} sources, {inserted} claims, {len(conflicts)} conflicts, {len(gaps)} gaps",
+        f"{len(sources)} sources, {total_claims} claims, {len(conflicts)} conflicts, {len(gaps)} gaps",
     )
     return {
         "ok": True,
         "sources": len(sources),
         "claims": inserted,
+        "total_claims": total_claims,
         "conflicts": len(conflicts),
         "gaps": len(gaps),
         "counts": {row["label"]: row["n"] for row in counts},
