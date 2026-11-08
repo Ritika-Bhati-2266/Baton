@@ -4,7 +4,7 @@ Run from the repository root:
     python scripts/make_round2_report.py
 
 Set BATON_LIVE_URL before running to embed the deployed link:
-    $env:BATON_LIVE_URL = "https://baton-handover.onrender.com"
+    $env:BATON_LIVE_URL = "https://baton-t3ax.onrender.com"
 """
 from __future__ import annotations
 

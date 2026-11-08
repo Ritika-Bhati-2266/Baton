@@ -4,7 +4,7 @@
 
 Baton is the ByteStorm submission for the CodeFrontier Hackathon, Round 2. It turns scattered, authorised project activity into a reviewed continuation plan for one departing member and one incoming member.
 
-- **Live demo:** <https://baton-u7of.onrender.com>
+- **Live demo:** <https://baton-t3ax.onrender.com>
 - **Source code:** <https://github.com/Ritika-Bhati-2266/Baton>
 
 The central idea is simple: **every machine-generated statement in a handover is a claim with a checked quote, a visible evidence label and an access label.** Human-added content is labelled as such, and nothing reaches the incoming person until a human approves it.
