@@ -439,8 +439,8 @@ add("p", "<b>How measured:</b> a disputed section returns to the approver queue,
 # 12
 add("h1", "12. Demo script for judges")
 add("bullets", [
-    "Open the dashboard. The demo case shows 6 sources and 0 claims before the first build.",
-    "Open the review console and click <b>Rebuild ledger</b>.",
+    "Open the dashboard. The demo case has 6 sources and is built automatically on start-up, so the review console already has 26 claims, 1 open conflict and 3 gaps.",
+    "Optionally use <b>Rebuild ledger</b> on the review console to watch the pipeline run again.",
     "Inspect the conflict card: meeting notes say driver B; README and commit say driver A.",
     "Click <b>Keep this side</b> on the driver-A group.",
     "Answer the spare-driver ownership gap with a short human answer; accept or answer the demo-venue dependency gap.",

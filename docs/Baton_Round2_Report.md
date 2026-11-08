@@ -263,7 +263,7 @@ SMOKE OK
   conflicts: 1
   gaps: 3
   labels: ['CONFLICTING', 'INFERRED', 'MISSING', 'SINGLE_SOURCE', 'VERIFIED']
-  temp data: C:\Users\hp\AppData\Local\Temp\baton-smoke-jv2xa8bs
+  temp data: C:\Users\hp\AppData\Local\Temp\baton-smoke-j81vn4xi
 ```
 
 ### What the test asserts
@@ -318,8 +318,8 @@ SMOKE OK
 
 ## 12. Demo script for judges
 
-- Open the dashboard. The demo case shows 6 sources and 0 claims before the first build.
-- Open the review console and click <b>Rebuild ledger</b>.
+- Open the dashboard. The demo case has 6 sources and is built automatically on start-up, so the review console already has 26 claims, 1 open conflict and 3 gaps.
+- Optionally use <b>Rebuild ledger</b> on the review console to watch the pipeline run again.
 - Inspect the conflict card: meeting notes say driver B; README and commit say driver A.
 - Click <b>Keep this side</b> on the driver-A group.
 - Answer the spare-driver ownership gap with a short human answer; accept or answer the demo-venue dependency gap.

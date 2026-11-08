@@ -31,7 +31,7 @@ docker build -t baton .
 docker run --rm -p 8000:8000 baton
 ```
 
-No API key is required. The demo corpus and the deterministic verifier run fully offline. The demo case is seeded automatically on first start.
+No API key is required. The demo corpus and the deterministic verifier run fully offline. The demo case is seeded and built automatically on first start.
 
 ---
 
