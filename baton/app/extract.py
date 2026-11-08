@@ -174,6 +174,8 @@ def _parse_marked_lines(source: dict) -> list[dict]:
                 value = contact
             elif claim_type == "decision":
                 value = _driver_value(body) or body
+            elif claim_type == "next_action":
+                contact = _find_person(body)
             elif claim_type == "dependency":
                 contact = _find_person(body)
             claims.append(

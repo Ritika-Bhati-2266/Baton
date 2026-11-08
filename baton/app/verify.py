@@ -250,8 +250,11 @@ def detect_gaps(case_id: str) -> list[dict]:
     for group in next_actions.values():
         if any((c.get("owner") or "").strip() for c in group):
             continue
-        claim = group[0]
-        _insert_gap(case_id, claim, f"Task has no owner: {claim['text']}", True)
+        for claim in group:
+            if (claim.get("contact") or "").strip():
+                continue
+            _insert_gap(case_id, claim, f"Task has no owner: {claim['text']}", True)
+            break
 
     for claim in claims:
         if claim["type"] == "dependency" and not (claim.get("contact") or "").strip():
