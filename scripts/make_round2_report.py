@@ -36,7 +36,7 @@ OUT = ROOT.parent / "Baton docs"
 SHOTS = OUT / "screenshots"
 OUT.mkdir(parents=True, exist_ok=True)
 
-LIVE_URL = os.environ.get("BATON_LIVE_URL", "[ADD THE DEPLOYED RENDER URL BEFORE SUBMITTING]")
+LIVE_URL = os.environ.get("BATON_LIVE_URL", "https://baton-t3ax.onrender.com")
 REPO_URL = "https://github.com/Ritika-Bhati-2266/Baton"
 SMOKE_OUTPUT = ""
 smoke_file = OUT / "smoke_test_output.txt"

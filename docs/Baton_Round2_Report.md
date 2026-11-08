@@ -263,7 +263,7 @@ SMOKE OK
   conflicts: 1
   gaps: 3
   labels: ['CONFLICTING', 'INFERRED', 'MISSING', 'SINGLE_SOURCE', 'VERIFIED']
-  temp data: C:\Users\hp\AppData\Local\Temp\baton-smoke-9iq4pf3x
+  temp data: C:\Users\hp\AppData\Local\Temp\baton-smoke-jv2xa8bs
 ```
 
 ### What the test asserts

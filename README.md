@@ -15,7 +15,7 @@ The central idea is simple: **every machine-generated statement in a handover is
 ## Quick start (Windows)
 
 ```powershell
-cd "D:\PROJECTS\Hackathon\Baton"
+cd Baton
 .\run.ps1
 ```
 

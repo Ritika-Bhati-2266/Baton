@@ -1,6 +1,6 @@
 """End-to-end smoke test for the Baton Round 2 MVP.
 
-Run from the baton/ directory:
+Run from the repository root:
     python scripts/smoke_test.py
 
 It sets BATON_DATA_DIR to a temporary folder before importing the app, so the
