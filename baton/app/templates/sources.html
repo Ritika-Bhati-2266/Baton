@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Sources · {{ case.project }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <span class="eyebrow">Connect</span>
+    <h1>Authorised sources</h1>
+    <p class="muted">{{ case.project or case.title }} · {{ case.departing_name }} → {{ case.incoming_name }}</p>
+  </div>
+  <div class="head-actions">
+    <span class="badge status-{{ case.status }}">{{ case.status }}</span>
+    <form method="post" action="/cases/{{ case.id }}/build">
+      <button class="btn primary" type="submit">Run pipeline</button>
+    </form>
+    <a class="btn" href="/cases/{{ case.id }}/review">Review console</a>
+  </div>
+</div>
+
+<div class="banner info">
+  <b>Connecting a source does not make it shareable.</b>
+  Each source carries an access label. Claims inherit the most restrictive label of their evidence, and role views filter the ledger in code.
+</div>
+
+<section class="section grid-2">
+  <div class="card">
+    <h2>Upload a document</h2>
+    <form method="post" action="/cases/{{ case.id }}/sources/upload" enctype="multipart/form-data" class="form-grid">
+      <label class="span-2">File<input type="file" name="file" accept=".md,.txt,.csv,.json,.pdf" required></label>
+      <label>Access label
+        <select name="acl">
+          <option value="team">team — shareable with the incoming person</option>
+          <option value="leads">leads only — hidden from the incoming person</option>
+          <option value="private">private — approver only</option>
+        </select>
+      </label>
+      <label>Source type
+        <select name="kind">
+          <option value="auto">Detect automatically</option>
+          <option value="doc">Document / README</option>
+          <option value="notes">Meeting notes</option>
+          <option value="task_csv">Task CSV</option>
+          <option value="repo">Repository export (JSON)</option>
+          <option value="chat">Chat export</option>
+        </select>
+      </label>
+      <label>Author<input name="author" placeholder="Optional"></label>
+      <label>Source date<input name="source_date" placeholder="YYYY-MM-DD"></label>
+      <button class="btn primary" type="submit">Add source</button>
+    </form>
+    <p class="hint">Markdown and text notes support explicit markers: <code>DECISION:</code>, <code>OWNER:</code>, <code>RISK:</code>, <code>DEPENDENCY:</code>, <code>OPEN QUESTION:</code>, <code>TODO:</code>, <code>NEXT ACTION:</code>, <code>BLOCKER:</code>, <code>RECURRING PROBLEM:</code>, <code>CONTACT:</code>, <code>INFERRED:</code>. The deterministic extractor also reads README ownership sentences, run instructions and task CSVs.</p>
+  </div>
+
+  <div class="card">
+    <h2>Import a GitHub repository</h2>
+    <form method="post" action="/cases/{{ case.id }}/sources/github" class="form-grid">
+      <label class="span-2">Repository<input name="repo" placeholder="owner/repository" required></label>
+      <label>Access label
+        <select name="acl">
+          <option value="team">team</option>
+          <option value="leads">leads only</option>
+          <option value="private">private</option>
+        </select>
+      </label>
+      <button class="btn" type="submit">Import public issues and commits</button>
+    </form>
+    <p class="hint">Read-only import of up to 20 issues and 20 commits through the GitHub REST API. For private repositories set <code>GITHUB_TOKEN</code> in the environment; the token is never stored.</p>
+    <div class="callout">
+      <b>Model boundary</b>
+      <span>The deterministic verifier always runs locally. If an external LLM adapter is enabled in a later round, only team-labelled text is eligible; leads-only and private sources never leave the deployment.</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>Source inventory</h2>
+    <span class="muted">{{ sources|length }} source(s)</span>
+  </div>
+  <div class="source-list">
+    {% for s in sources %}
+      <article class="source">
+        <div class="source-head">
+          <div>
+            <b>{{ s.name }}</b>
+            <span class="badge ghost">{{ s.kind }}</span>
+            <span class="badge acl">{{ s.acl }}</span>
+            {% if s.external_url %}<a class="small" href="{{ s.external_url }}" target="_blank" rel="noopener">open repo</a>{% endif %}
+          </div>
+          <div class="source-meta">
+            <span>{{ s.author or 'author unknown' }}</span>
+            <span>{{ s.source_date or 'date unknown' }}</span>
+            <span>{{ s.chunk_count }} chunk(s)</span>
+          </div>
+        </div>
+        <div class="redaction">
+          <span class="muted small">Redaction preview for an external model: {{ s.preview.secrets }} secret(s), {{ s.preview.identities }} identit(ies) replaced.</span>
+          <details>
+            <summary>Show redacted text</summary>
+            <pre>{{ s.preview.text }}</pre>
+          </details>
+          <details>
+            <summary>Show original text</summary>
+            <pre>{{ s.content }}</pre>
+          </details>
+        </div>
+        <form method="post" action="/cases/{{ case.id }}/sources/{{ s.id }}/delete" onsubmit="return confirm('Remove this source? Rebuild the ledger afterwards.')">
+          <button class="btn small danger" type="submit">Remove source</button>
+        </form>
+      </article>
+    {% else %}
+      <p class="empty">No sources yet. Upload a document or import a repository.</p>
+    {% endfor %}
+  </div>
+</section>
+
+{% endblock %}

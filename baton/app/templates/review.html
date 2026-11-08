@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Review · {{ case.project }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <span class="eyebrow">Review console</span>
+    <h1>{{ case.project or case.title }}</h1>
+    <p class="muted">{{ case.departing_name }} → {{ case.incoming_name }} · Approver: {{ case.approver_name }}</p>
+  </div>
+  <div class="head-actions">
+    <span class="badge status-{{ case.status }}">{{ case.status }}</span>
+    {% if case.status == 'published' %}<span class="badge v">v{{ case.version }}</span>{% endif %}
+    <form method="post" action="/cases/{{ case.id }}/build">
+      <button class="btn" type="submit" onclick="return confirm('Rebuild the ledger from sources? Review actions on generated claims will be reset.')">Rebuild ledger</button>
+    </form>
+    <form method="post" action="/cases/{{ case.id }}/approve-all">
+      <button class="btn" type="submit">Approve all reviewable</button>
+    </form>
+    {% if rules.can_publish %}
+      <form method="post" action="/cases/{{ case.id }}/publish">
+        <button class="btn primary" type="submit">Publish handover</button>
+      </form>
+    {% else %}
+      <button class="btn primary" type="button" disabled title="Resolve the blocking issues first">Publish handover</button>
+    {% endif %}
+    <a class="btn ghost" href="/cases/{{ case.id }}/handover?role=approver">Approver preview</a>
+  </div>
+</div>
+
+{% if not rules.can_publish %}
+  <div class="banner block">
+    <b>Publishing is blocked</b>
+    <ul>
+      {% for reason in rules.reasons %}<li>{{ reason }}</li>{% endfor %}
+    </ul>
+    <span class="muted small">Nothing unapproved reaches the incoming person's view.</span>
+  </div>
+{% else %}
+  <div class="banner ok">
+    <b>Ready to publish.</b>
+    {{ rules.approved_count }} approved claim(s) will be shared; {{ rules.pending_count }} pending claim(s) stay out of the reader view.
+  </div>
+{% endif %}
+
+<section class="stats">
+  <div><b>{{ counts.get('TOTAL', 0) }}</b><span>claims</span></div>
+  <div><b>{{ counts.get('VERIFIED', 0) }}</b><span>verified</span></div>
+  <div><b>{{ counts.get('SINGLE_SOURCE', 0) }}</b><span>single-source</span></div>
+  <div class="warn"><b>{{ counts.get('CONFLICTING', 0) }}</b><span>conflicting</span></div>
+  <div class="warn"><b>{{ counts.get('MISSING', 0) }}</b><span>missing / gaps</span></div>
+  <div><b>{{ counts.get('HUMAN_ASSERTED', 0) }}</b><span>human-asserted</span></div>
+  <div><b>{{ counts.get('INFERRED', 0) }}</b><span>inferred</span></div>
+  <div class="warn"><b>{{ counts.get('QUOTE_FAILED', 0) }}</b><span>quote failed</span></div>
+  <div><b>{{ counts.get('approved', 0) }}</b><span>approved</span></div>
+  <div><b>{{ counts.get('pending', 0) }}</b><span>pending</span></div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>Conflicts</h2>
+    <span class="muted">Same topic, different value. Both sides stay visible until a human decides.</span>
+  </div>
+  {% for cfl in conflicts %}
+    <article class="issue {{ 'done' if cfl.status == 'resolved' else 'blocking' }}">
+      <div class="issue-head">
+        <span class="label l-conflicting">CONFLICTING</span>
+        <b>{{ cfl.topic_key }}</b>
+        <span class="badge {{ 'ok' if cfl.status == 'resolved' else 'bad' }}">{{ cfl.status }}</span>
+      </div>
+      {% if cfl.status == 'resolved' %}
+        <p class="muted">Resolved by {{ cfl.resolved_by }} · kept: <b>{{ cfl.resolved_value }}</b></p>
+      {% endif %}
+      <div class="value-grid">
+        {% for vg in cfl.value_groups %}
+          <div class="value-card">
+            {% for claim in vg %}
+              <div class="claim-mini">
+                <div class="claim-text">{{ claim.text }}</div>
+                {% for e in claim.evidence %}
+                  <div class="evidence quote-only">"{{ e.quote }}" <span class="muted">· {{ e.source_name }}</span></div>
+                {% endfor %}
+                <div class="muted small">{{ claim.evidence[0].source_kind if claim.evidence else 'source' }} · base label {{ claim.base_label }} · {{ claim.acl }} access</div>
+              </div>
+            {% endfor %}
+            {% if cfl.status == 'open' %}
+              <form method="post" action="/conflicts/{{ cfl.id }}/resolve">
+                <input type="hidden" name="claim_id" value="{{ vg[0].id }}">
+                <button class="btn small" type="submit">Keep this side</button>
+              </form>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      {% if cfl.status == 'open' %}
+        <form method="post" action="/conflicts/{{ cfl.id }}/resolve" class="inline">
+          <input type="hidden" name="choice" value="reject_both">
+          <button class="btn small danger" type="submit">Reject both</button>
+        </form>
+      {% endif %}
+    </article>
+  {% else %}
+    <p class="empty">No conflicts detected in this build.</p>
+  {% endfor %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>Critical gaps</h2>
+    <span class="muted">Answer them, or accept them explicitly. Acceptance is logged and shown as a known gap.</span>
+  </div>
+  {% set critical_gaps = gaps|selectattr('gap_critical', 'equalto', 1)|list %}
+  {% for gap in critical_gaps %}
+    <article class="issue {{ 'done' if gap.gap_accepted else 'blocking' }}">
+        <div class="issue-head">
+          <span class="label l-missing">MISSING</span>
+          <b>{{ gap.text }}</b>
+          <span class="badge {{ 'ok' if gap.gap_accepted else 'bad' }}">{{ 'accepted' if gap.gap_accepted else 'open' }}</span>
+        </div>
+        {% for e in gap.evidence %}
+          <div class="evidence quote-only">"{{ e.quote }}" <span class="muted">· {{ e.source_name }}</span></div>
+        {% endfor %}
+        {% if gap.gap_accepted %}
+          <p class="muted small">Accepted by {{ gap.reviewer }} on {{ gap.reviewed_at }}.
+            {% if gap.gap_answer %}<br>Answer: <b>{{ gap.gap_answer }}</b>{% endif %}
+          </p>
+        {% else %}
+          <form method="post" action="/claims/{{ gap.id }}/answer-gap" class="gap-form">
+            <textarea name="answer" rows="2" placeholder="Add the missing ownership, contact or procedure. This is stored as HUMAN_ASSERTED evidence." required></textarea>
+            <button class="btn small primary" type="submit">Save answer</button>
+          </form>
+          <form method="post" action="/claims/{{ gap.id }}/accept-gap" class="inline">
+            <button class="btn small" type="submit">Accept as known gap</button>
+          </form>
+        {% endif %}
+      </article>
+  {% else %}
+    <p class="empty">No critical gaps detected in this build.</p>
+  {% endfor %}
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>Claims to review</h2>
+    <span class="muted">{{ claims|length }} shown</span>
+  </div>
+
+  <form method="get" action="/cases/{{ case.id }}/review" class="filterbar">
+    <select name="label">
+      <option value="">All labels</option>
+      {% for l in labels %}<option value="{{ l }}" {{ 'selected' if filters.label == l else '' }}>{{ l.replace('_', ' ') }}</option>{% endfor %}
+    </select>
+    <select name="ctype">
+      <option value="">All types</option>
+      {% for t in claim_types %}<option value="{{ t }}" {{ 'selected' if filters.ctype == t else '' }}>{{ t.replace('_', ' ') }}</option>{% endfor %}
+    </select>
+    <select name="status">
+      <option value="">All statuses</option>
+      {% for s in ['pending', 'approved', 'rejected'] %}<option value="{{ s }}" {{ 'selected' if filters.status == s else '' }}>{{ s }}</option>{% endfor %}
+    </select>
+    <input name="q" value="{{ filters.q }}" placeholder="Search claim or quote">
+    <button class="btn small" type="submit">Filter</button>
+    <a class="btn small ghost" href="/cases/{{ case.id }}/review">Clear</a>
+  </form>
+
+  <div class="claim-list">
+    {% for claim in claims %}
+      <article class="claim">
+        <div class="claim-head">
+          <span class="label l-{{ claim.evidence_label|lower }}">{{ claim.evidence_label.replace('_', ' ') }}</span>
+          <span class="type">{{ claim.type.replace('_', ' ') }}</span>
+          {% if claim.acl != 'team' %}<span class="badge acl">{{ claim.acl }} only</span>{% endif %}
+          <span class="badge {{ claim.status }}">{{ claim.status }}</span>
+        </div>
+        <p class="claim-text">{{ claim.text }}</p>
+        <div class="claim-meta">
+          {% if claim.owner %}<span>Owner: <b>{{ claim.owner }}</b></span>{% endif %}
+          {% if claim.due_date %}<span>Due: {{ claim.due_date }}</span>{% endif %}
+          {% if claim.contact %}<span>Contact: {{ claim.contact }}</span>{% endif %}
+          <span>Topic: {{ claim.topic_key }}</span>
+        </div>
+        {% for e in claim.evidence %}
+          <div class="evidence">
+            <div class="quote">"{{ e.quote }}"</div>
+            <div class="muted small">{{ e.source_name or 'unknown source' }} · {{ e.source_date or 'date unknown' }} · {{ e.source_kind or '' }} · {% if e.verified %}<span class="ok">quote verified</span>{% else %}<span class="bad">quote failed</span>{% endif %}</div>
+          </div>
+        {% endfor %}
+        <div class="claim-actions">
+          {% if claim.status != 'approved' and claim.evidence_label not in ['CONFLICTING', 'QUOTE_FAILED'] %}
+            <form method="post" action="/claims/{{ claim.id }}/approve">
+              <button class="btn small primary" type="submit">Approve</button>
+            </form>
+          {% endif %}
+          {% if claim.status != 'rejected' %}
+            <form method="post" action="/claims/{{ claim.id }}/reject">
+              <button class="btn small danger" type="submit">Reject</button>
+            </form>
+          {% endif %}
+          {% if claim.evidence_label == 'CONFLICTING' %}
+            <span class="hint">Resolve the conflict card above.</span>
+          {% elif claim.evidence_label == 'QUOTE_FAILED' %}
+            <span class="hint bad">Quote not found. Edit it or reject the claim.</span>
+          {% endif %}
+          <details class="edit">
+            <summary>Edit claim</summary>
+            <form method="post" action="/claims/{{ claim.id }}/edit" class="form-grid compact">
+              <label>Type
+                <select name="claim_type">
+                  {% for t in claim_types %}<option value="{{ t }}" {{ 'selected' if claim.type == t else '' }}>{{ t.replace('_', ' ') }}</option>{% endfor %}
+                </select>
+              </label>
+              <label class="span-2">Claim text<textarea name="text" rows="2" required>{{ claim.text }}</textarea></label>
+              <label>Value<input name="value" value="{{ claim.value or '' }}"></label>
+              <label>Owner<input name="owner" value="{{ claim.owner or '' }}"></label>
+              <label>Due date<input name="due_date" value="{{ claim.due_date or '' }}" placeholder="YYYY-MM-DD"></label>
+              <label>Contact<input name="contact" value="{{ claim.contact or '' }}"></label>
+              <button class="btn small" type="submit">Save as human-asserted</button>
+            </form>
+            <p class="hint">Human edits are never shown as machine-verified. Approve again after editing.</p>
+          </details>
+        </div>
+      </article>
+    {% else %}
+      <p class="empty">No claims match those filters. <a href="/cases/{{ case.id }}/review">Clear filters</a>.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>Other gaps</h2>
+    <span class="muted">Non-critical gaps are shown to the incoming person as known gaps.</span>
+  </div>
+  {% set soft_gaps = gaps|rejectattr('gap_critical')|list %}
+  {% for gap in soft_gaps %}
+      <article class="issue {{ 'done' if gap.gap_accepted else '' }}">
+        <div class="issue-head">
+          <span class="label l-missing">MISSING</span>
+          <b>{{ gap.text }}</b>
+          <span class="badge {{ 'ok' if gap.gap_accepted else 'pending' }}">{{ 'accepted' if gap.gap_accepted else 'pending' }}</span>
+        </div>
+        {% for e in gap.evidence %}
+          <div class="evidence quote-only">"{{ e.quote }}" <span class="muted">· {{ e.source_name }}</span></div>
+        {% endfor %}
+        {% if not gap.gap_accepted %}
+          <form method="post" action="/claims/{{ gap.id }}/answer-gap" class="gap-form">
+            <textarea name="answer" rows="2" placeholder="Add the missing procedure or context." required></textarea>
+            <button class="btn small primary" type="submit">Save answer</button>
+          </form>
+          <form method="post" action="/claims/{{ gap.id }}/accept-gap" class="inline">
+            <button class="btn small" type="submit">Accept as known gap</button>
+          </form>
+        {% elif gap.gap_answer %}
+          <p class="muted small">Answer: <b>{{ gap.gap_answer }}</b></p>
+        {% endif %}
+      </article>
+  {% else %}
+    <p class="empty">No non-critical gaps detected in this build.</p>
+  {% endfor %}
+</section>
+
+{% endblock %}

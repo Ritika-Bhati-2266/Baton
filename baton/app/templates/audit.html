@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Audit · {{ case.project }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <span class="eyebrow">Traceability</span>
+    <h1>Audit log</h1>
+    <p class="muted">Append-only record of approvals, edits, resolutions, publishing and access events for {{ case.project or case.title }}.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn" href="/cases/{{ case.id }}/review">Back to review</a>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="audit-table">
+    <thead>
+      <tr><th>When</th><th>Actor</th><th>Role</th><th>Action</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+        <tr>
+          <td class="mono">{{ e.created_at }}</td>
+          <td>{{ e.actor }}</td>
+          <td><span class="badge ghost">{{ e.role }}</span></td>
+          <td><b>{{ e.action }}</b></td>
+          <td class="muted">{{ e.detail }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="empty">No audit entries yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

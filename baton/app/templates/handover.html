@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Handover · {{ case.project }}{% endblock %}
+{% block content %}
+
+{% macro claim_item(claim) %}
+  <article class="handover-item">
+    <div class="claim-head">
+      <span class="label l-{{ claim.evidence_label|lower }}">{{ claim.evidence_label.replace('_', ' ') }}</span>
+      <span class="type">{{ claim.type.replace('_', ' ') }}</span>
+      {% if claim.acl != 'team' %}<span class="badge acl">{{ claim.acl }} only</span>{% endif %}
+    </div>
+    <p class="claim-text">{{ claim.text }}</p>
+    <div class="claim-meta">
+      {% if claim.owner %}<span>Owner: <b>{{ claim.owner }}</b></span>{% endif %}
+      {% if claim.due_date %}<span>Due: {{ claim.due_date }}</span>{% endif %}
+      {% if claim.contact %}<span>Contact: {{ claim.contact }}</span>{% endif %}
+    </div>
+    {% for e in claim.evidence %}
+      <div class="evidence quote-only">"{{ e.quote }}" <span class="muted">· {{ e.source_name }}{% if e.source_date %} · {{ e.source_date }}{% endif %}</span></div>
+    {% endfor %}
+  </article>
+{% endmacro %}
+
+<div class="page-head">
+  <div>
+    <span class="eyebrow">Handover</span>
+    <h1>{{ case.project or case.title }}</h1>
+    <p class="muted">{{ case.departing_name }} → {{ case.incoming_name }}</p>
+  </div>
+  <div class="head-actions">
+    {% if case.status == 'published' %}
+      <span class="badge v">approved v{{ case.version }}</span>
+      <span class="muted small">by {{ case.published_by }} · {{ case.published_at }}</span>
+    {% else %}
+      <span class="badge draft">draft preview</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="role-tabs">
+  <a class="{{ 'active' if role == 'incoming' else '' }}" href="/cases/{{ case.id }}/handover?role=incoming">Incoming · {{ case.incoming_name }}</a>
+  <a class="{{ 'active' if role == 'departing' else '' }}" href="/cases/{{ case.id }}/handover?role=departing">Departing · {{ case.departing_name }}</a>
+  <a class="{{ 'active' if role == 'approver' else '' }}" href="/cases/{{ case.id }}/handover?role=approver">Approver · {{ case.approver_name }}</a>
+</div>
+
+{% if case.status != 'published' %}
+  <div class="banner block">
+    <b>Draft preview — not yet shared.</b>
+    This view is available to the approver only. Publish from the review console to release the role-filtered handover.
+  </div>
+{% endif %}
+
+{% if role == 'incoming' and case.status == 'published' %}
+  {% if case.acknowledged_at %}
+    <div class="banner ok"><b>Receipt acknowledged.</b> {{ case.acknowledged_by }} confirmed receipt on {{ case.acknowledged_at }}.</div>
+  {% else %}
+    <div class="banner info">
+      <b>Confirm receipt when you have read this handover.</b>
+      <form method="post" action="/cases/{{ case.id }}/acknowledge" class="inline">
+        <button class="btn small primary" type="submit">Acknowledge receipt</button>
+      </form>
+    </div>
+  {% endif %}
+{% endif %}
+
+<div class="handover-layout">
+  <div class="handover-main">
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Start here</h2>
+        <span class="muted small">Generated from approved claims, each linked to evidence below.</span>
+      </div>
+      <ul class="summary">
+        {% for line in summary %}<li>{{ line }}</li>{% endfor %}
+      </ul>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Owned by you now</h2>
+        <span class="muted small">{{ owned|length }} assigned item(s)</span>
+      </div>
+      {% for claim in owned %}{{ claim_item(claim) }}{% else %}
+        <p class="empty">No task is explicitly assigned to you yet. Confirm ownership with the approver before starting.</p>
+      {% endfor %}
+    </section>
+
+    {% set risks = (groups.get('risk', []) + groups.get('blocker', []) + groups.get('dependency', [])) %}
+    <section class="panel">
+      <div class="section-head">
+        <h2>Risks, blockers and dependencies</h2>
+        <span class="muted small">Ranked by the review, not invented</span>
+      </div>
+      {% for claim in risks %}{{ claim_item(claim) }}{% else %}
+        <p class="empty">No approved risk or dependency claims.</p>
+      {% endfor %}
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Decision timeline</h2>
+        <span class="muted small">What was decided, when and why</span>
+      </div>
+      {% set decisions = groups.get('decision', []) %}
+      {% if decisions %}
+        <ol class="timeline">
+          {% for claim in decisions %}
+            <li>
+              <span class="when">{{ claim.event_date or 'date unknown' }}</span>
+              <div>
+                {{ claim_item(claim) }}
+              </div>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="empty">No approved decisions.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>First-week plan</h2>
+        <span class="muted small">Ordered by due date</span>
+      </div>
+      {% for claim in groups.get('next_action', []) %}{{ claim_item(claim) }}{% else %}
+        <p class="empty">No approved next actions.</p>
+      {% endfor %}
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Open questions and known gaps</h2>
+        <span class="muted small">Marked as unresolved instead of guessed</span>
+      </div>
+      {% for claim in groups.get('open_question', []) %}{{ claim_item(claim) }}{% endfor %}
+      {% for gap in gaps %}
+        <article class="handover-item gap-item">
+          <div class="claim-head">
+            <span class="label l-{{ gap.evidence_label|lower }}">{{ gap.evidence_label.replace('_', ' ') }}</span>
+            <span class="type">known gap</span>
+            {% if gap.gap_critical %}<span class="badge bad">critical</span>{% endif %}
+          </div>
+          <p class="claim-text">{{ gap.text }}</p>
+          {% if gap.gap_answer %}
+            <p class="muted"><b>Human answer:</b> {{ gap.gap_answer }}</p>
+          {% else %}
+            <p class="muted small">Accepted by the approver as a known gap. Ask them for the missing context.</p>
+          {% endif %}
+          {% for e in gap.evidence %}
+            <div class="evidence quote-only">"{{ e.quote }}" <span class="muted">· {{ e.source_name }}</span></div>
+          {% endfor %}
+        </article>
+      {% endfor %}
+      {% if not gaps and not groups.get('open_question') %}
+        <p class="empty">No open questions or accepted gaps.</p>
+      {% endif %}
+    </section>
+
+    {% if groups.get('contact') or groups.get('recurring_problem') %}
+      <section class="panel">
+        <div class="section-head"><h2>People and recurring problems</h2></div>
+        {% for claim in groups.get('contact', []) %}{{ claim_item(claim) }}{% endfor %}
+        {% for claim in groups.get('recurring_problem', []) %}{{ claim_item(claim) }}{% endfor %}
+      </section>
+    {% endif %}
+
+  </div>
+
+  <aside class="handover-side">
+    <div class="card sticky">
+      <h3>This view is filtered</h3>
+      <p class="muted small">You are viewing as <b>{{ role_name }}</b>. Allowed access labels: {{ ', '.join(allowed_acls) if allowed_acls else 'team' }}.</p>
+      <p class="hidden-note"><b>{{ hidden_count }}</b> approved item(s) are hidden for your role.</p>
+      <p class="muted small">Restricted content is never rendered as partial text. Ask the approver for access if you need it.</p>
+      <hr>
+      <h3>Evidence trail</h3>
+      <p class="muted small">Every machine claim carries a checked quote. Claims marked <span class="label l-single_source">SINGLE SOURCE</span> rest on one informal source. <span class="label l-inferred">INFERRED</span> claims were confirmed by the approver. <span class="label l-human_asserted">HUMAN ASSERTED</span> content was added by a person.</p>
+      <a class="btn small ghost" href="/cases/{{ case.id }}/audit">Open audit log</a>
+    </div>
+  </aside>
+</div>
+
+{% endblock %}

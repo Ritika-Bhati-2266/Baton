@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <div class="hero-copy">
+    <span class="eyebrow">Knowledge handover</span>
+    <h1>Critical knowledge should not leave with the person.</h1>
+    <p>Baton turns authorised project activity into a reviewed, evidence-linked continuation plan. Every machine statement is a claim with a checked quote, a visible evidence label and an access label. Nothing reaches the incoming person until a human approves it.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="/cases/{{ demo_id }}/review">Open the demo review console</a>
+      <a class="btn" href="/cases/{{ demo_id }}/handover?role=incoming">See the incoming person's view</a>
+    </div>
+  </div>
+  <div class="hero-panel">
+    <div class="panel-title">The promise</div>
+    <ol class="promise">
+      <li><b>Traceable</b><span>Claims link to the exact source passage.</span></li>
+      <li><b>Actionable</b><span>Ownership, risks and next actions are explicit.</span></li>
+      <li><b>Permission-aware</b><span>Role views filter claims in code.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>Handover cases</h2>
+    <span class="muted">Synthetic demo data · no sign-in required</span>
+  </div>
+  <div class="case-grid">
+    {% for c in cases %}
+      <article class="case-card">
+        <div class="case-top">
+          <div>
+            <span class="badge status-{{ c.status }}">{{ c.status }}</span>
+            {% if c.status == 'published' %}<span class="badge v">v{{ c.version }}</span>{% endif %}
+          </div>
+          <span class="muted small">{{ c.created_at[:10] }}</span>
+        </div>
+        <h3>{{ c.project or c.title }}</h3>
+        <p class="muted">{{ c.departing_name }} → {{ c.incoming_name }}</p>
+        <div class="metrics">
+          <div><b>{{ c.source_count }}</b><span>sources</span></div>
+          <div><b>{{ c.claim_count }}</b><span>claims</span></div>
+          <div><b>{{ c.approved_count }}</b><span>approved</span></div>
+          <div class="{{ 'warn' if c.open_conflicts or c.open_gaps else '' }}"><b>{{ c.open_conflicts }}</b><span>conflicts</span></div>
+          <div class="{{ 'warn' if c.open_gaps else '' }}"><b>{{ c.open_gaps }}</b><span>critical gaps</span></div>
+        </div>
+        <div class="case-actions">
+          <a class="btn small" href="/cases/{{ c.id }}/review">Review</a>
+          <a class="btn small" href="/cases/{{ c.id }}/sources">Sources</a>
+          <a class="btn small ghost" href="/cases/{{ c.id }}/handover?role=incoming">Incoming view</a>
+        </div>
+      </article>
+    {% else %}
+      <p class="empty">No cases yet. Create one below.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section grid-2">
+  <div class="card">
+    <h2>How the workflow runs</h2>
+    <ol class="steps">
+      <li><b>Connect</b><span>Authorised sources are ingested read-only with an access label.</span></li>
+      <li><b>Reconstruct</b><span>Typed claims are extracted with the exact supporting quote.</span></li>
+      <li><b>Verify</b><span>A deterministic verifier checks every quote, then detects conflicts and gaps.</span></li>
+      <li><b>Review</b><span>A responsible person edits, rejects, resolves and approves per claim.</span></li>
+      <li><b>Handover</b><span>Approved claims are filtered for the reader's role and published as a plan.</span></li>
+    </ol>
+  </div>
+  <div class="card">
+    <h2>Evidence labels</h2>
+    <ul class="legend">
+      {% for label in ['VERIFIED', 'SINGLE_SOURCE', 'CONFLICTING', 'MISSING', 'HUMAN_ASSERTED', 'INFERRED', 'QUOTE_FAILED'] %}
+        <li><span class="label l-{{ label|lower }}">{{ label.replace('_', ' ') }}</span><span>{{ label_help[label] }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section grid-2">
+  <div class="card">
+    <h2>Start a new handover</h2>
+    <form method="post" action="/cases" class="form-grid">
+      <label>Project<input name="project" placeholder="e.g. Robotics club" required></label>
+      <label>Departing member<input name="departing" placeholder="A. Rao" required></label>
+      <label>Incoming person<input name="incoming" placeholder="N. Singh" required></label>
+      <label>Approver<input name="approver" placeholder="T. Lead" required></label>
+      <button class="btn primary" type="submit">Create case</button>
+    </form>
+    <p class="hint">You will add documents or a GitHub repo on the next screen. Notes support markers such as <code>DECISION:</code>, <code>OWNER:</code>, <code>RISK:</code>, <code>DEPENDENCY:</code>, <code>OPEN QUESTION:</code>, <code>TODO:</code> and <code>CONTACT:</code>.</p>
+  </div>
+  <div class="card">
+    <h2>Demo controls</h2>
+    <p class="muted">The rover-club dataset is synthetic and includes a planted motor-driver conflict, two critical gaps and a leads-only chat source.</p>
+    <form method="post" action="/demo/reset" onsubmit="return confirm('Reset all data and reload the demo?')">
+      <button class="btn danger" type="submit">Reset demo data</button>
+    </form>
+    <p class="hint">The review console, sources, audit log and incoming view all read from the same SQLite ledger.</p>
+  </div>
+</section>
+
+{% endblock %}

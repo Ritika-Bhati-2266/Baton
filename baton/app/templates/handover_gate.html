@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Not published · {{ case.project }}{% endblock %}
+{% block content %}
+
+<div class="gate">
+  <span class="eyebrow">Handover gate</span>
+  <h1>This handover has not been approved yet.</h1>
+  <p class="muted">Baton does not share a draft. A responsible approver must resolve conflicts, answer or accept critical gaps, approve the claims and publish before the incoming person can open the continuation plan.</p>
+  <div class="gate-actions">
+    <a class="btn primary" href="/cases/{{ case.id }}/review">Go to the review console</a>
+    <a class="btn ghost" href="/cases/{{ case.id }}/handover?role=approver">Approver draft preview</a>
+  </div>
+  <div class="card gate-card">
+    <h3>{{ case.project or case.title }}</h3>
+    <p class="muted">{{ case.departing_name }} → {{ case.incoming_name }}</p>
+    <p class="muted small">Status: {{ case.status }} · version {{ case.version }}</p>
+  </div>
+</div>
+
+{% endblock %}

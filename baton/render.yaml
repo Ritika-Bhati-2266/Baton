@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: baton-handover
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: BATON_DATA_DIR
+        value: /tmp/baton
+      - key: GITHUB_TOKEN
+        sync: false
